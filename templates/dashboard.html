@@ -61,18 +61,25 @@
             <select id="filter-score" onchange="applyFilters()">
                 <option value="0">Any</option>
                 <option value="30">30+</option>
-                <option value="50">50+</option>
-                <option value="60">60+</option>
-                <option value="70">70+</option>
+                <option value="55" selected>55+ recommended</option>
+                <option value="70">70+ strong</option>
             </select>
         </div>
         <div class="filter-group">
-            <label>India Remote</label>
-            <select id="filter-india" onchange="applyFilters()">
-                <option value="">All</option>
-                <option value="yes">India Friendly</option>
-                <option value="maybe">India + Maybe</option>
-                <option value="no">Not India</option>
+                <label>Remote from India</label>
+                <select id="filter-india" onchange="applyFilters()">
+                    <option value="Eligible" selected>Eligible only</option>
+                    <option value="Needs Verification">Needs Verification</option>
+                    <option value="Ineligible">Ineligible</option>
+                    <option value="">All</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Posted</label>
+            <select id="filter-recency" onchange="applyFilters()">
+                <option value="7">Last 7 days</option>
+                <option value="30" selected>Last 30 days</option>
+                <option value="">Any age</option>
             </select>
         </div>
         <div class="filter-group">

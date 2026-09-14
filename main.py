@@ -76,6 +76,9 @@ async def api_get_jobs(
     location: Optional[str] = None,
     tech: Optional[str] = None,
     india_friendly: Optional[str] = None,
+    remote_india_eligibility: Optional[str] = None,
+    max_posted_age_days: Optional[int] = Query(None, ge=0),
+    recommendable_only: bool = False,
     company_domain: Optional[str] = None,
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
@@ -83,7 +86,10 @@ async def api_get_jobs(
     jobs = get_jobs(
         source=source, status=status, min_score=min_score,
         search=search, location=location, tech=tech,
-        india_friendly=india_friendly, company_domain=company_domain,
+        india_friendly=india_friendly, remote_india_eligibility=remote_india_eligibility,
+        max_posted_age_days=max_posted_age_days,
+        recommendable_only=recommendable_only,
+        company_domain=company_domain,
         limit=limit, offset=offset,
     )
     return {"jobs": jobs, "count": len(jobs)}
@@ -335,7 +341,7 @@ async def api_outreach_bulk_delete(body: OutreachBulkDelete):
 
 @app.post("/api/outreach/refresh")
 async def api_outreach_refresh(limit: int = Query(15, ge=1, le=50),
-                               min_score: int = Query(40, ge=0, le=100)):
+                               min_score: int = Query(55, ge=0, le=100)):
     """Refresh = run a fresh collection, then generate outreach scoped to the
     jobs that were actually returned by that collection. Previous batches stay
     in place and show up in the 'Old' tab."""
@@ -350,9 +356,9 @@ async def api_outreach_refresh(limit: int = Query(15, ge=1, le=50),
 
 @app.post("/api/outreach/generate")
 async def api_generate_outreach(
-    min_score: int = Query(40, ge=0, le=100),
+    min_score: int = Query(55, ge=0, le=100),
     limit: int = Query(15, ge=1, le=50),
-    india_friendly: Optional[str] = "maybe",
+    india_friendly: Optional[str] = "yes",
 ):
     """For top N high-scoring jobs without existing outreach,
     build LinkedIn search URLs + generate DMs. No API credits used."""
@@ -643,7 +649,7 @@ async def api_rescore_all(
     conn = get_connection()
     try:
         rows = conn.execute(
-            "SELECT id, title, description, location, tech_stack FROM jobs"
+            "SELECT id, title, description, location, posted_date, tech_stack FROM jobs"
         ).fetchall()
     finally:
         conn.close()
@@ -654,7 +660,8 @@ async def api_rescore_all(
     try:
         for r in rows:
             result = score_job(r["title"], r["description"] or "",
-                               r["location"] or "", profile=profile)
+                               r["location"] or "", profile=profile,
+                               posted_date=r["posted_date"])
 
             if delete_below_min and result["score"] < min_store:
                 conn.execute("DELETE FROM jobs WHERE id = ?", (r["id"],))
@@ -667,13 +674,27 @@ async def api_rescore_all(
             existing_tech.update(result["tech_stack"])
             tech_stack = ", ".join(sorted(existing_tech))
 
+            import json
             conn.execute(
                 "UPDATE jobs SET relevance_score = ?, experience_level = ?, "
                 "india_friendly = ?, location_note = ?, tech_stack = ?, "
-                "scored_profile_id = ? WHERE id = ?",
+                "scored_profile_id = ?, fit_classification = ?, "
+                "remote_india_eligibility = ?, eligibility_confidence = ?, "
+                "experience_requirement = ?, experience_compatibility = ?, "
+                "seniority = ?, role_family = ?, secondary_role_families = ?, "
+                "role_family_confidence = ?, role_family_scores = ?, responsibility_evidence = ?, posted_age_days = ?, "
+                "match_reasons = ?, important_gaps = ?, "
+                "resume_modification_recommended = ? WHERE id = ?",
                 (result["score"], result["experience_level"],
                  result["india_friendly"], result["location_note"],
-                 tech_stack, profile_id, r["id"]),
+                 tech_stack, profile_id, result["fit_classification"],
+                 result["remote_india_eligibility"], result["eligibility_confidence"],
+                 result["experience_requirement"], result["experience_compatibility"],
+                 result["seniority"], result["role_family"],
+                 json.dumps(result["secondary_role_families"]), result["role_family_confidence"],
+                 json.dumps(result["role_family_scores"]), json.dumps(result["responsibility_evidence"]), result["posted_age_days"],
+                 json.dumps(result["reasons"]), json.dumps(result["important_gaps"]),
+                 int(result["resume_modification_recommended"]), r["id"]),
             )
             updated += 1
         conn.commit()

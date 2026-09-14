@@ -1,0 +1,172 @@
+name: "Senior AI & Operations Leadership (8+ YOE)"
+description: "Private profile for India-remote strategy, operations, AI deployment, product operations, and delivery leadership roles."
+schema_version: 1
+
+search:
+  default_terms:
+    - "AI deployment lead remote India"
+    - "strategy operations lead remote India"
+    - "business operations senior manager remote India"
+    - "product operations lead remote India"
+    - "AI transformation lead remote India"
+    - "implementation director remote India"
+  title_keywords_positive:
+    - "strategy & operations"
+    - "strategy and operations"
+    - "business operations"
+    - "deployment strategy"
+    - "ai deployment"
+    - "ai operations"
+    - "product operations"
+    - "strategic operations"
+    - "ai transformation"
+    - "ai strategy"
+    - "delivery lead"
+    - "program lead"
+    - "implementation lead"
+    - "customer deployment"
+    - "head of"
+    - "senior manager"
+    - "associate director"
+    - "growth & retention"
+    - "adoption"
+    - "forward deployed"
+    - "solutions lead"
+    - "strategic programs"
+    - "chief of staff"
+    - "special projects"
+  title_keywords_negative:
+    - "junior"
+    - "intern"
+    - "software engineer"
+    - "software developer"
+    - "backend developer"
+    - "frontend developer"
+    - "data scientist"
+    - "ml engineer"
+    - "machine learning engineer"
+    - "project manager"
+    - "individual contributor"
+  relevant_tech: &strengths
+    - "generative ai"
+    - "voice ai"
+    - "ai agents"
+    - "llm"
+    - "rag"
+    - "ai evaluation"
+    - "enterprise ai"
+    - "product delivery"
+    - "business operations"
+    - "operational strategy"
+    - "0-to-1"
+    - "process building"
+    - "scaling operations"
+    - "enterprise implementation"
+    - "cross-functional"
+    - "stakeholder management"
+    - "cost optimization"
+    - "customer deployment"
+    - "commercialization"
+    - "team leadership"
+  jsearch_default_queries:
+    - {query: "AI deployment lead", country: "IN", date_posted: "week", remote_jobs_only: true}
+    - {query: "strategy operations lead", country: "IN", date_posted: "week", remote_jobs_only: true}
+    - {query: "business operations senior manager", country: "IN", date_posted: "week", remote_jobs_only: true}
+    - {query: "product operations lead", country: "IN", date_posted: "week", remote_jobs_only: true}
+    - {query: "AI transformation strategy lead", country: "IN", date_posted: "week", remote_jobs_only: true}
+    - {query: "implementation customer deployment director", country: "IN", date_posted: "week", remote_jobs_only: true}
+
+scoring:
+  candidate_years: 8
+  experience_target: "senior"
+  min_relevance_score: 55
+  min_score_to_store: 25
+  weights: {title: 25, tech: 30, experience: 20, signal: 25}
+  core_tech: ["generative ai", "voice ai", "ai agents", "llm", "rag", "enterprise ai"]
+  backend_signals: []
+  strengths: *strengths
+  leadership_signals:
+    - "cross-functional"
+    - "c-suite"
+    - "executive stakeholder"
+    - "team leadership"
+    - "lead a team"
+    - "build and scale"
+    - "0-to-1"
+    - "poc to production"
+    - "commercialization"
+    - "enterprise deployment"
+    - "own executive relationships"
+    - "executive relationships"
+    - "strategic ownership"
+  role_families:
+    "AI Deployment / Transformation": ["ai deployment", "ai adoption", "enterprise ai", "ai transformation", "ai strategy", "customer ai", "production ai", "production deployment"]
+    "Strategy & Operations": ["operating strategy", "operational strategy", "strategic planning", "business strategy", "operating model", "scalable operating processes"]
+    "Business Operations": ["business operations", "operational cadence", "operating processes", "process improvement", "cross-functional operations"]
+    "Customer Success / Adoption / Retention": ["customer adoption", "drive adoption", "customer retention", "drive retention", "customer expansion", "retention and expansion", "customer success", "executive relationships"]
+    "Implementation / Deployment": ["customer deployment", "customer deployments", "implementation strategy", "enterprise implementation", "solution implementation", "deployment plan", "production deployment"]
+    "Product Operations": ["product operations", "product processes", "product feedback loop", "product and engineering", "product/engineering"]
+    "Program / Delivery Leadership": ["program delivery", "delivery leadership", "strategic programs", "program governance", "portfolio delivery", "delivery roadmap"]
+    "GTM / Growth Operations": ["go-to-market", "gtm operations", "growth operations", "revenue operations", "retention and expansion", "commercial strategy"]
+    "Strategic Customer / Enterprise Programs": ["strategic customers", "enterprise customers", "enterprise customer", "executive sponsor", "executive relationships", "customer transformation"]
+  business_outcome_signals:
+    - "adoption"
+    - "retention"
+    - "expansion"
+    - "commercialization"
+    - "revenue growth"
+    - "cost optimization"
+    - "customer outcomes"
+    - "time to value"
+    - "operational efficiency"
+    - "scale operations"
+  outside_scope_signals:
+    - "write production code"
+    - "software development lifecycle"
+    - "design and implement software"
+    - "develop backend"
+    - "develop frontend"
+    - "train machine learning models"
+    - "build data pipelines"
+    - "individual contributor"
+  seniority_titles:
+    "Associate Director": ["associate director"]
+    "Senior Manager": ["senior manager"]
+    "Head": ["head of", "head -", "head –"]
+    "Director": ["director"]
+    "Lead": ["lead"]
+
+location:
+  india_positive: ["remote india", "india remote", "remote - india", "remote / india", "worldwide", "global remote", "apac remote", "asia remote"]
+  india_negative: ["us only", "usa only", "united states only", "canada only", "uk only", "eu only", "europe only", "americas only", "north america only", "must reside in the us", "us-based", "canada-based", "uk-based", "eu-based"]
+  timezone_compatible: ["ist", "india standard time", "apac", "asia", "flexible", "async"]
+  timezone_incompatible: ["pst only", "est only", "us hours required", "us timezone required"]
+
+outreach:
+  candidate_name: ""
+  candidate_core_tech: ["enterprise AI deployment", "AI operations", "product delivery", "business operations"]
+  candidate_extra_tech: ["Generative AI", "Voice AI", "AI agents", "LLMs", "RAG", "AI evaluation"]
+  linkedin_search_titles:
+    - {title: "Head of Strategy OR VP Strategy OR Strategy Lead", label: "Hiring Manager — Strategy", category: "hiring_manager"}
+    - {title: "Head of Operations OR VP Operations OR Head of Business Operations", label: "Hiring Manager — Operations", category: "hiring_manager"}
+    - {title: "Head of Deployment OR Deployment Lead OR Head of Customer Success", label: "Hiring Manager — Deployment", category: "hiring_manager"}
+    - {title: "Head of Product Operations OR Product Operations Lead", label: "Hiring Manager — Product Ops", category: "hiring_manager"}
+    - {title: "Senior Operations Manager OR Business Operations Lead OR Strategy Lead", label: "Senior Same-Function Leader", category: "same_function"}
+    - {title: "GM India OR India Operations", label: "India Leader / Referral Contact", category: "referral"}
+    - {title: "AI Deployment OR AI Operations OR AI Strategy", label: "Potential Employee Referral", category: "referral"}
+    - {title: "Talent Partner OR Senior Recruiter OR APAC Recruiter OR Talent Acquisition", label: "Recruiter / Talent Partner", category: "recruiter"}
+  bio_short: "8+ years leading enterprise AI delivery, operational strategy, and cross-functional deployments"
+  achievements: []
+  dm_short_template: "{greeting}, I’m exploring the {title} role at {company}. I bring {bio_short}. I’d value your perspective on the team and role. Would you be open to connecting?"
+  dm_long_template: |
+    {greeting},
+
+    I’m exploring the {title} opportunity at {company}. I bring {bio_short}, including taking complex initiatives from POC to production and building scalable delivery processes.
+
+    I would value your perspective on the role and team. If you think my background may be relevant, would you be open to a brief conversation?
+
+    Thanks,
+    {candidate_name}
+  email_digest_subject_role: "senior AI & operations leadership"
+  email_greeting: "Senior Leadership Job Digest"
+  recipient_email: ""
