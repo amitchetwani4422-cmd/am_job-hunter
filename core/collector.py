@@ -2,6 +2,7 @@
 Two tracks: job boards (existing) + company ATS crawling (new)."""
 
 import asyncio
+import json
 from datetime import datetime
 from core.models import Job
 from core.database import (
@@ -18,6 +19,7 @@ from sources.greenhouse import GreenhouseSource
 from sources.lever import LeverSource
 from sources.ashby import AshbySource
 from sources.html_scraper import HTMLCareerSource
+from sources.company_careers import build_target_company_sources
 from config.settings import RAPIDAPI_KEY
 
 # Days before a job not re-seen gets deleted (cleanup). Could be profile-driven
@@ -35,6 +37,7 @@ def _build_job_board_sources() -> list:
         RemotiveSource(),
         RemoteOKSource(),
         ArbeitnowSource(),
+        *build_target_company_sources(),
     ]
     if RAPIDAPI_KEY:
         # Queries come from the active profile (single source of truth).
@@ -76,6 +79,12 @@ async def _fetch_from_source(source) -> list[Job]:
     try:
         jobs = await source.fetch()
         log(f"  [OK] {source.name}: {len(jobs)} jobs fetched")
+        if hasattr(source, "diagnostics"):
+            diag = source.diagnostics
+            log(f"    endpoint(s): {', '.join(diag['endpoints_used']) or 'none succeeded'}")
+            log(f"    raw={diag['raw_jobs_fetched']} parsed={diag['jobs_parsed']} skipped={diag['jobs_skipped']}")
+            for error in diag["errors"]:
+                log(f"    error: {error}")
         return jobs
     except Exception as e:
         log(f"  [FAIL] {source.name}: {e}")
@@ -85,22 +94,41 @@ async def _fetch_from_source(source) -> list[Job]:
 def _score_and_store(jobs: list[Job], stats: dict, profile: dict = None):
     """Score, filter, deduplicate, and store jobs. Shared by both tracks."""
     stats.setdefault("filtered_out", 0)
+    stats.setdefault("stored_by_source", {})
+    stats.setdefault("filtered_by_source", {})
     profile = profile or get_active_profile()
     profile_id = profile.get("_id")
     min_store = int((profile.get("scoring") or {}).get("min_score_to_store", 25))
 
     for job in jobs:
-        result = score_job(job.title, job.description, job.location, profile=profile)
+        result = score_job(job.title, job.description, job.location, profile=profile,
+                           posted_date=job.posted_date)
 
         # Filter: drop irrelevant jobs before storing (saves DB space)
         if result["score"] < min_store:
             stats["filtered_out"] += 1
+            stats["filtered_by_source"][job.source] = stats["filtered_by_source"].get(job.source, 0) + 1
             continue
 
         job.relevance_score = result["score"]
         job.experience_level = result["experience_level"]
         job.india_friendly = result["india_friendly"]
         job.location_note = result["location_note"]
+        job.fit_classification = result["fit_classification"]
+        job.remote_india_eligibility = result["remote_india_eligibility"]
+        job.eligibility_confidence = result["eligibility_confidence"]
+        job.experience_requirement = result["experience_requirement"]
+        job.experience_compatibility = result["experience_compatibility"]
+        job.seniority = result["seniority"]
+        job.role_family = result["role_family"]
+        job.secondary_role_families = json.dumps(result["secondary_role_families"])
+        job.role_family_confidence = result["role_family_confidence"]
+        job.role_family_scores = json.dumps(result["role_family_scores"])
+        job.responsibility_evidence = json.dumps(result["responsibility_evidence"])
+        job.posted_age_days = result["posted_age_days"]
+        job.match_reasons = json.dumps(result["reasons"])
+        job.important_gaps = json.dumps(result["important_gaps"])
+        job.resume_modification_recommended = result["resume_modification_recommended"]
 
         existing_tech = set(t.strip() for t in job.tech_stack.split(",") if t.strip())
         existing_tech.update(result["tech_stack"])
@@ -119,6 +147,7 @@ def _score_and_store(jobs: list[Job], stats: dict, profile: dict = None):
             stats["new"] += 1
         else:
             stats["updated"] = stats.get("updated", 0) + 1
+        stats["stored_by_source"][job.source] = stats["stored_by_source"].get(job.source, 0) + 1
 
 
 async def run_company_crawl(company_ids: list[str] = None) -> dict:
@@ -193,7 +222,30 @@ async def run_job_boards() -> dict:
     stats["fetched"] = len(all_jobs)
     profile = get_active_profile()
     _score_and_store(all_jobs, stats, profile=profile)
+    for source in sources:
+        if hasattr(source, "diagnostics"):
+            source.diagnostics["jobs_stored"] = stats["stored_by_source"].get(source.name, 0)
+            source.diagnostics["jobs_skipped_by_scorer"] = stats["filtered_by_source"].get(source.name, 0)
+            log(f"  [{source.company['name']}] stored={source.diagnostics['jobs_stored']} "
+                f"skipped_by_scorer={source.diagnostics['jobs_skipped_by_scorer']}")
     return stats
+
+
+async def run_target_company_collection(company_key: str) -> dict:
+    """Diagnose and collect one curated official company source independently."""
+    init_db()
+    sources = build_target_company_sources(company_key)
+    if not sources:
+        return {"error": f"Unknown target company: {company_key}"}
+    source = sources[0]
+    jobs = await _fetch_from_source(source)
+    stats = {"fetched": len(jobs), "new": 0, "updated": 0, "filtered_out": 0,
+             "sources": {source.name: len(jobs)}}
+    _score_and_store(jobs, stats, profile=get_active_profile())
+    diagnostics = dict(source.diagnostics)
+    diagnostics["jobs_stored"] = stats["stored_by_source"].get(source.name, 0)
+    diagnostics["jobs_skipped_by_scorer"] = stats["filtered_by_source"].get(source.name, 0)
+    return {"company": source.company["name"], "diagnostics": diagnostics, "collection": stats}
 
 
 async def run_collection(include_companies: bool = True) -> dict:

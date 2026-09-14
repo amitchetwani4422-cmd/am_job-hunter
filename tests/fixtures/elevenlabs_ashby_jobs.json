@@ -1,0 +1,28 @@
+{
+  "jobs": [
+    {
+      "id": "elevenlabs-deployment-strategist-india",
+      "title": "Deployment Strategist - India",
+      "location": "Remote",
+      "secondaryLocations": [{"name": "India"}, {"name": "Bengaluru, India"}],
+      "descriptionPlain": "Lead enterprise AI deployment and customer adoption in India. Own implementation strategy, product collaboration and executive customer relationships. Requires 6-9 years of experience.",
+      "publishedAt": "2026-09-11T09:00:00Z",
+      "jobUrl": "https://jobs.ashbyhq.com/elevenlabs/elevenlabs-deployment-strategist-india",
+      "applyUrl": "https://jobs.ashbyhq.com/elevenlabs/elevenlabs-deployment-strategist-india/application?utm_source=careers",
+      "employmentType": "FullTime",
+      "isListed": true
+    },
+    {
+      "id": "elevenlabs-deployment-strategist-lead-india",
+      "title": "Deployment Strategist Lead - India",
+      "location": {"name": "India - Remote"},
+      "secondaryLocations": [{"name": "APAC"}],
+      "descriptionHtml": "<p>Lead a team responsible for enterprise voice AI deployments, adoption, commercialization and strategic customer outcomes across India and APAC. Requires 8+ years.</p>",
+      "publishedAt": "2026-09-12T09:00:00Z",
+      "jobUrl": "https://jobs.ashbyhq.com/elevenlabs/elevenlabs-deployment-strategist-lead-india",
+      "applyUrl": "https://jobs.ashbyhq.com/elevenlabs/elevenlabs-deployment-strategist-lead-india/application",
+      "employmentType": "FullTime",
+      "isListed": true
+    }
+  ]
+}

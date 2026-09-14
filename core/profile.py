@@ -41,12 +41,19 @@ def default_config() -> dict:
             "jsearch_default_queries": [],
         },
         "scoring": {
+            "candidate_years": 8,
             "experience_target": "mid",
             "min_relevance_score": 50,
             "min_score_to_store": 25,
             "weights": {"title": 35, "tech": 35, "experience": 15, "signal": 15},
             "core_tech": [],
             "backend_signals": [],
+            "strengths": [],
+            "leadership_signals": [],
+            "role_families": {},
+            "business_outcome_signals": [],
+            "outside_scope_signals": [],
+            "seniority_titles": {},
             "experience_bonuses": {
                 "fresher": {"fresher": 15, "junior": 10, "mid": 0,   "senior": -5},
                 "junior":  {"fresher": 5,  "junior": 15, "mid": 5,   "senior": -5},
@@ -509,13 +516,25 @@ def ensure_first_run_seed() -> Optional[int]:
         if count > 0:
             return None
         ts = datetime.utcnow().isoformat()
-        cfg = _legacy_profile_from_settings()
+        # New personal installations start with the senior AI/operations profile.
+        # Fall back to the legacy config if the bundled preset cannot be read.
+        try:
+            import yaml
+            with open(PROFILES_DIR / "senior_ai_operations.yaml", encoding="utf-8") as f:
+                preset = yaml.safe_load(f) or {}
+            cfg = validate_config({k: v for k, v in preset.items() if k not in ("name", "description")})
+            seed_name = preset.get("name", "Senior AI & Operations Leadership")
+            seed_description = preset.get("description", "Personal senior-level job search profile")
+            seed_source = "preset:senior_ai_operations"
+        except Exception:
+            cfg = _legacy_profile_from_settings()
+            seed_name = "Backend Python (legacy)"
+            seed_description = "Seeded from pre-profile hardcoded settings."
+            seed_source = "legacy"
         cur = conn.execute(
             "INSERT INTO profiles (name, description, config_json, created_at, updated_at, source) "
-            "VALUES (?, ?, ?, ?, ?, 'legacy')",
-            ("Backend Python (legacy)",
-             "Seeded from pre-profile hardcoded settings. Edit or switch to another preset.",
-             json.dumps(cfg), ts, ts),
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (seed_name, seed_description, json.dumps(cfg), ts, ts, seed_source),
         )
         pid = cur.lastrowid
         conn.execute(

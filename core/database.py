@@ -1,6 +1,7 @@
 import sqlite3
 from typing import Optional
 from config.settings import DB_PATH
+from core.identity import should_refresh_from_source
 
 
 def get_connection() -> sqlite3.Connection:
@@ -50,6 +51,30 @@ def init_db():
         conn.execute("ALTER TABLE jobs ADD COLUMN scored_profile_id INTEGER DEFAULT NULL")
     except sqlite3.OperationalError:
         pass
+    new_job_columns = {
+        "external_job_id": "TEXT DEFAULT ''",
+        "remote_status": "TEXT DEFAULT ''",
+        "fit_classification": "TEXT DEFAULT ''",
+        "remote_india_eligibility": "TEXT DEFAULT 'Needs Verification'",
+        "eligibility_confidence": "TEXT DEFAULT 'Low'",
+        "experience_requirement": "TEXT DEFAULT 'Not stated'",
+        "experience_compatibility": "TEXT DEFAULT 'Needs Verification'",
+        "seniority": "TEXT DEFAULT ''",
+        "role_family": "TEXT DEFAULT ''",
+        "secondary_role_families": "TEXT DEFAULT '[]'",
+        "role_family_confidence": "INTEGER DEFAULT 0",
+        "role_family_scores": "TEXT DEFAULT '{}'",
+        "responsibility_evidence": "TEXT DEFAULT '[]'",
+        "posted_age_days": "INTEGER DEFAULT NULL",
+        "match_reasons": "TEXT DEFAULT '[]'",
+        "important_gaps": "TEXT DEFAULT '[]'",
+        "resume_modification_recommended": "INTEGER DEFAULT 0",
+    }
+    for column, definition in new_job_columns.items():
+        try:
+            conn.execute(f"ALTER TABLE jobs ADD COLUMN {column} {definition}")
+        except sqlite3.OperationalError:
+            pass
 
     # Companies table
     conn.execute("""
@@ -210,6 +235,31 @@ def init_db():
 
 # ── Jobs CRUD ──────────────────────────────────────────────────
 
+def _normalize_duplicate_job(conn: sqlite3.Connection, job_dict: dict, now: str) -> None:
+    """Point duplicates at the stored id and preserve authoritative direct data.
+
+    This runs before the original fingerprint upsert block so URL-based
+    deduplication does not require changing that shared update path.
+    """
+    existing = conn.execute(
+        "SELECT * FROM jobs WHERE id = ? OR (url != '' AND url = ?) "
+        "OR (external_job_id != '' AND external_job_id = ? AND lower(company) = lower(?)) LIMIT 1",
+        (job_dict["id"], job_dict.get("url", ""),
+         job_dict.get("external_job_id", ""), job_dict.get("company", "")),
+    ).fetchone()
+    if not existing:
+        return
+
+    job_dict["id"] = existing["id"]
+    if not should_refresh_from_source(existing["source"], job_dict.get("source", "")):
+        # Copy only fields already supplied by the incoming model so migration-
+        # specific database columns cannot leak into the update parameter set.
+        for key in list(job_dict):
+            if key in existing.keys() and key not in ("last_seen",):
+                job_dict[key] = existing[key]
+        job_dict["last_seen"] = now
+
+
 def insert_job(job_dict: dict) -> str:
     """Upsert a job.
     Returns 'new' if new, 'updated' if existed (last_seen refreshed).
@@ -220,26 +270,44 @@ def insert_job(job_dict: dict) -> str:
     job_dict["last_seen"] = now
 
     try:
+        _normalize_duplicate_job(conn, job_dict, now)
         existing = conn.execute("SELECT id FROM jobs WHERE id = ?", (job_dict["id"],)).fetchone()
         if existing:
-            # Update last_seen + refreshed timestamp; keep status/notes intact
-            conn.execute("UPDATE jobs SET last_seen = ? WHERE id = ?", (now, job_dict["id"]))
+            # Refresh source and assessment fields, preserving user workflow state.
+            refreshed = {k: v for k, v in job_dict.items() if k not in ("id", "status", "mark_for_email", "discovered_at")}
+            refreshed["last_seen"] = now
+            assignments = ", ".join(f"{key} = :{key}" for key in refreshed)
+            conn.execute(f"UPDATE jobs SET {assignments} WHERE id = :id", {**refreshed, "id": job_dict["id"]})
             conn.commit()
             return "updated"
         job_dict.setdefault("scored_profile_id", None)
+        job_dict.setdefault("external_job_id", "")
+        job_dict.setdefault("remote_status", "")
         conn.execute("""
             INSERT INTO jobs (id, title, company, location, description, url,
-                            source, posted_date, discovered_at, tech_stack,
+                            source, external_job_id, remote_status, posted_date, discovered_at, tech_stack,
                             experience_level, relevance_score, status,
                             company_domain, salary, job_type,
                             india_friendly, location_note, last_seen,
-                            scored_profile_id)
+                            scored_profile_id, fit_classification,
+                            remote_india_eligibility, eligibility_confidence,
+                            experience_requirement, experience_compatibility,
+                            seniority, role_family, secondary_role_families,
+                            role_family_confidence, role_family_scores, responsibility_evidence,
+                            posted_age_days, match_reasons,
+                            important_gaps, resume_modification_recommended)
             VALUES (:id, :title, :company, :location, :description, :url,
-                    :source, :posted_date, :discovered_at, :tech_stack,
+                    :source, :external_job_id, :remote_status, :posted_date, :discovered_at, :tech_stack,
                     :experience_level, :relevance_score, :status,
                     :company_domain, :salary, :job_type,
                     :india_friendly, :location_note, :last_seen,
-                    :scored_profile_id)
+                    :scored_profile_id, :fit_classification,
+                    :remote_india_eligibility, :eligibility_confidence,
+                    :experience_requirement, :experience_compatibility,
+                    :seniority, :role_family, :secondary_role_families,
+                    :role_family_confidence, :role_family_scores, :responsibility_evidence,
+                    :posted_age_days, :match_reasons,
+                    :important_gaps, :resume_modification_recommended)
         """, job_dict)
         conn.commit()
         return "new"
@@ -297,6 +365,9 @@ def get_jobs(
     location: Optional[str] = None,
     tech: Optional[str] = None,
     india_friendly: Optional[str] = None,
+    remote_india_eligibility: Optional[str] = None,
+    max_posted_age_days: Optional[int] = None,
+    recommendable_only: bool = False,
     company_domain: Optional[str] = None,
     seen_after: Optional[str] = None,     # ISO timestamp; only jobs refreshed at/after this
     limit: int = 100,
@@ -329,6 +400,14 @@ def get_jobs(
             query += " AND india_friendly = 'no'"
         elif india_friendly == "maybe":
             query += " AND india_friendly IN ('yes', 'maybe')"
+    if remote_india_eligibility:
+        query += " AND remote_india_eligibility = ?"
+        params.append(remote_india_eligibility)
+    if max_posted_age_days is not None:
+        query += " AND (posted_age_days IS NULL OR posted_age_days <= ?)"
+        params.append(max_posted_age_days)
+    if recommendable_only:
+        query += " AND experience_compatibility NOT LIKE 'Gap — hard 10+%'"
     if company_domain:
         query += " AND company_domain = ?"
         params.append(company_domain)
@@ -370,6 +449,9 @@ def get_stats() -> dict:
     by_india = conn.execute(
         "SELECT india_friendly, COUNT(*) as count FROM jobs GROUP BY india_friendly"
     ).fetchall()
+    by_eligibility = conn.execute(
+        "SELECT remote_india_eligibility, COUNT(*) as count FROM jobs GROUP BY remote_india_eligibility"
+    ).fetchall()
     avg_score = conn.execute(
         "SELECT AVG(relevance_score) FROM jobs WHERE relevance_score > 0"
     ).fetchone()[0]
@@ -379,6 +461,7 @@ def get_stats() -> dict:
         "by_source": {row["source"]: row["count"] for row in by_source},
         "by_status": {row["status"]: row["count"] for row in by_status},
         "by_india": {row["india_friendly"]: row["count"] for row in by_india},
+        "by_eligibility": {row["remote_india_eligibility"]: row["count"] for row in by_eligibility},
         "avg_score": round(avg_score, 1) if avg_score else 0,
     }
 

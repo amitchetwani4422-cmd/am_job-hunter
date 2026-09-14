@@ -1,8 +1,9 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
-import hashlib
 import re
+
+from core.identity import job_fingerprint
 
 
 class Job(BaseModel):
@@ -12,6 +13,8 @@ class Job(BaseModel):
     description: str = ""
     url: str = ""
     source: str = ""
+    external_job_id: str = ""
+    remote_status: str = ""
     posted_date: Optional[str] = None
     discovered_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
     tech_stack: str = ""  # comma-separated
@@ -23,12 +26,26 @@ class Job(BaseModel):
     job_type: str = ""  # full-time/part-time/contract
     india_friendly: str = "unknown"  # yes/no/maybe/unknown
     location_note: str = ""  # explanation of location check
+    fit_classification: str = ""
+    remote_india_eligibility: str = "Needs Verification"
+    eligibility_confidence: str = "Low"
+    experience_requirement: str = "Not stated"
+    experience_compatibility: str = "Needs Verification"
+    seniority: str = ""
+    role_family: str = ""
+    secondary_role_families: str = "[]"
+    role_family_confidence: int = 0
+    role_family_scores: str = "{}"
+    responsibility_evidence: str = "[]"
+    posted_age_days: Optional[int] = None
+    match_reasons: str = "[]"
+    important_gaps: str = "[]"
+    resume_modification_recommended: bool = False
 
     @property
     def fingerprint(self) -> str:
         """Generate dedup fingerprint from company + title + location."""
-        raw = f"{self.company.lower().strip()}|{self.title.lower().strip()}|{self.location.lower().strip()}"
-        return hashlib.md5(raw.encode()).hexdigest()
+        return job_fingerprint(self.company, self.title, self.location)
 
     def extract_domain(self) -> str:
         """Extract company domain from job URL."""

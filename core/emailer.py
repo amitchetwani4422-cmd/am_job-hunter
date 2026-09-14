@@ -66,8 +66,11 @@ def _render_card(i: int, item: dict) -> str:
     india_color = {"yes": "#00b894", "maybe": "#fdcb6e", "no": "#e17055"}.get(india, "#8b8fa3")
 
     # Group searches by category for nicer layout
-    colors = {"engineering": "#0a66c2", "executive": "#6c5ce7", "hr": "#00b894"}
-    labels = {"engineering": "Engineering", "executive": "C-Level", "hr": "HR / Recruiters"}
+    colors = {"hiring_manager": "#0a66c2", "same_function": "#6c5ce7", "referral": "#d97706", "recruiter": "#00b894",
+              "engineering": "#0a66c2", "executive": "#6c5ce7", "hr": "#00b894"}
+    labels = {"hiring_manager": "Hiring Managers", "same_function": "Senior Same-Function People",
+              "referral": "Potential Referral Contacts", "recruiter": "Recruiters / Talent Partners",
+              "engineering": "Engineering", "executive": "C-Level", "hr": "HR / Recruiters"}
 
     grouped = {}
     for s in searches:
@@ -75,7 +78,7 @@ def _render_card(i: int, item: dict) -> str:
         grouped.setdefault(cat, []).append(s)
 
     search_buttons = ""
-    for cat in ["engineering", "executive", "hr"]:
+    for cat in ["hiring_manager", "same_function", "referral", "recruiter", "engineering", "executive", "hr"]:
         if cat not in grouped:
             continue
         group_buttons = "".join([
@@ -274,8 +277,8 @@ def send_daily_digest(limit: int = None, dry_run: bool = False) -> dict:
         return {"error": str(e)}
 
 
-def generate_outreach_for_top_jobs(limit: int = 15, min_score: int = 40,
-                                   india_friendly: str = "maybe",
+def generate_outreach_for_top_jobs(limit: int = 15, min_score: int = 55,
+                                   india_friendly: str = "yes",
                                    seen_after: Optional[str] = None) -> int:
     """Create outreach items for the highest-scoring jobs that don't have one yet.
     If `seen_after` is given, only jobs refreshed at/after that timestamp qualify —
@@ -293,6 +296,9 @@ def generate_outreach_for_top_jobs(limit: int = 15, min_score: int = 40,
     profile_id = profile.get("_id")
 
     top_jobs = get_jobs(min_score=min_score, india_friendly=india_friendly,
+                         remote_india_eligibility="Eligible",
+                         max_posted_age_days=30,
+                         recommendable_only=True,
                          seen_after=seen_after, limit=limit * 5)
     candidates = [j for j in top_jobs if not outreach_exists_for_job(j["id"])][:limit]
 

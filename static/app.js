@@ -2,7 +2,7 @@ const state = {
     jobs: [],
     stats: {},
     sources: [],
-    filters: { source: '', status: '', min_score: 0, search: '', location: '', tech: '', india_friendly: '' },
+    filters: { source: '', status: '', min_score: 55, search: '', location: '', tech: '', remote_india_eligibility: 'Eligible', max_posted_age_days: 30, recommendable_only: true },
     offset: 0,
     limit: 50,
     collecting: false,
@@ -23,7 +23,9 @@ async function loadJobs() {
     if (f.search) params.set('search', f.search);
     if (f.location) params.set('location', f.location);
     if (f.tech) params.set('tech', f.tech);
-    if (f.india_friendly) params.set('india_friendly', f.india_friendly);
+    if (f.remote_india_eligibility) params.set('remote_india_eligibility', f.remote_india_eligibility);
+    if (f.max_posted_age_days != null) params.set('max_posted_age_days', f.max_posted_age_days);
+    if (f.recommendable_only) params.set('recommendable_only', 'true');
     params.set('limit', state.limit);
     params.set('offset', state.offset);
 
@@ -145,7 +147,7 @@ function indiaBadge(value, note) {
 // ── Render ──
 function renderStats() {
     const s = state.stats;
-    const indiaStats = s.by_india || {};
+    const eligibility = s.by_eligibility || {};
     document.getElementById('stats-bar').innerHTML = `
         <div class="stat-card">
             <div class="label">Total Jobs</div>
@@ -156,16 +158,16 @@ function renderStats() {
             <div class="value">${s.avg_score || 0}</div>
         </div>
         <div class="stat-card" style="border-color: var(--green);">
-            <div class="label">India Friendly</div>
-            <div class="value" style="color: var(--green);">${indiaStats['yes'] || 0}</div>
+            <div class="label">India Eligible</div>
+            <div class="value" style="color: var(--green);">${eligibility['Eligible'] || 0}</div>
         </div>
         <div class="stat-card" style="border-color: var(--yellow);">
-            <div class="label">Maybe India</div>
-            <div class="value" style="color: var(--yellow);">${indiaStats['maybe'] || 0}</div>
+            <div class="label">Needs Verification</div>
+            <div class="value" style="color: var(--yellow);">${eligibility['Needs Verification'] || 0}</div>
         </div>
         <div class="stat-card" style="border-color: var(--red);">
-            <div class="label">Not India</div>
-            <div class="value" style="color: var(--red);">${indiaStats['no'] || 0}</div>
+            <div class="label">Ineligible</div>
+            <div class="value" style="color: var(--red);">${eligibility['Ineligible'] || 0}</div>
         </div>
         ${Object.entries(s.by_source || {}).map(([src, count]) => `
             <div class="stat-card">
@@ -234,7 +236,9 @@ function renderJobs() {
                     <span>${escapeHtml(job.source)}</span>
                     ${job.salary ? `<span>${escapeHtml(job.salary)}</span>` : ''}
                     ${job.posted_date ? `<span>${formatDate(job.posted_date)}</span>` : ''}
-                    ${indiaBadge(job.india_friendly, job.location_note)}
+                    ${indiaBadge(job.india_friendly, `${job.remote_india_eligibility} (${job.eligibility_confidence} confidence): ${job.location_note}`)}
+                    ${job.fit_classification ? `<span class="tag">${escapeHtml(job.fit_classification)}</span>` : ''}
+                    ${job.role_family ? `<span class="tag">${escapeHtml(job.role_family)}</span>` : ''}
                     ${job.last_seen ? `<span style="font-size:11px;color:var(--text-muted);">Last seen: ${formatDate(job.last_seen)}</span>` : ''}
                 </div>
                 <div class="job-tags">
@@ -255,6 +259,11 @@ function openModal(jobId) {
     const job = state.jobs.find(j => j.id === jobId);
     if (!job) return;
 
+    const reasons = parseJsonList(job.match_reasons);
+    const gaps = parseJsonList(job.important_gaps);
+    const secondaryFamilies = parseJsonList(job.secondary_role_families);
+    const familyScores = parseJsonObject(job.role_family_scores);
+    const responsibilityEvidence = parseJsonList(job.responsibility_evidence);
     document.getElementById('modal-content').innerHTML = `
         <h2>${escapeHtml(job.title)}</h2>
         <div class="modal-company">${escapeHtml(job.company)} &mdash; ${escapeHtml(job.location)}</div>
@@ -266,9 +275,14 @@ function openModal(jobId) {
             ${indiaBadge(job.india_friendly, job.location_note)}
             <span class="tag">${escapeHtml(job.source)}</span>
             ${job.salary ? `<span class="tag">${escapeHtml(job.salary)}</span>` : ''}
-            ${job.experience_level ? `<span class="tag">${escapeHtml(job.experience_level)}</span>` : ''}
+            ${job.seniority ? `<span class="tag">${escapeHtml(job.seniority)}</span>` : ''}
         </div>
-        ${job.location_note ? `<div class="location-note">Location: ${escapeHtml(job.location_note)}</div>` : ''}
+        <div class="location-note"><strong>Remote from India:</strong> ${escapeHtml(job.remote_india_eligibility || 'Needs Verification')} · ${escapeHtml(job.eligibility_confidence || 'Low')} confidence — ${escapeHtml(job.location_note || '')}</div>
+        <div class="location-note"><strong>Primary role family:</strong> ${escapeHtml(job.role_family || 'Needs Review')} (${job.role_family_confidence || 0}% confidence)${secondaryFamilies.length ? ` · <strong>Secondary:</strong> ${secondaryFamilies.map(f => `${escapeHtml(f)} (${familyScores[f] || 0}%)`).join(', ')}` : ''} · <strong>Experience:</strong> ${escapeHtml(job.experience_requirement || 'Not stated')} — ${escapeHtml(job.experience_compatibility || 'Needs Verification')} · <strong>Age:</strong> ${job.posted_age_days == null ? 'Unknown' : `${job.posted_age_days} days`}</div>
+        <div class="location-note"><strong>Responsibility evidence:</strong><ul>${responsibilityEvidence.map(x => `<li>${escapeHtml(x)}</li>`).join('') || '<li>No description-based functional evidence found</li>'}</ul></div>
+        <div class="location-note"><strong>Why it matches:</strong><ul>${reasons.map(x => `<li>${escapeHtml(x)}</li>`).join('') || '<li>No strong match reasons found</li>'}</ul></div>
+        <div class="location-note"><strong>Important gaps:</strong><ul>${gaps.map(x => `<li>${escapeHtml(x)}</li>`).join('') || '<li>No important gaps detected</li>'}</ul></div>
+        <div class="location-note"><strong>Modify résumé?</strong> ${job.resume_modification_recommended ? 'Yes — tailor it to the requirements and gaps above.' : 'No material tailoring indicated beyond normal role alignment.'}</div>
         <div class="job-tags" style="margin-bottom:12px;">
             ${(job.tech_stack || '').split(',').filter(t => t.trim()).map(t =>
                 `<span class="tag">${escapeHtml(t.trim())}</span>`
@@ -284,6 +298,16 @@ function openModal(jobId) {
         </div>
     `;
     document.getElementById('modal-overlay').classList.add('active');
+}
+
+function parseJsonList(value) {
+    if (Array.isArray(value)) return value;
+    try { return JSON.parse(value || '[]'); } catch { return []; }
+}
+
+function parseJsonObject(value) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) return value;
+    try { return JSON.parse(value || '{}'); } catch { return {}; }
 }
 
 function closeModal() {
@@ -325,7 +349,9 @@ function applyFilters() {
     state.filters.search = document.getElementById('filter-search').value;
     state.filters.location = document.getElementById('filter-location').value;
     state.filters.tech = document.getElementById('filter-tech').value;
-    state.filters.india_friendly = document.getElementById('filter-india').value;
+    state.filters.remote_india_eligibility = document.getElementById('filter-india').value;
+    const recency = document.getElementById('filter-recency').value;
+    state.filters.max_posted_age_days = recency === '' ? null : parseInt(recency, 10);
     state.offset = 0;
     loadJobs();
 }
@@ -333,12 +359,13 @@ function applyFilters() {
 function resetFilters() {
     document.getElementById('filter-source').value = '';
     document.getElementById('filter-status').value = '';
-    document.getElementById('filter-score').value = '0';
+    document.getElementById('filter-score').value = '55';
     document.getElementById('filter-search').value = '';
     document.getElementById('filter-location').value = '';
     document.getElementById('filter-tech').value = '';
-    document.getElementById('filter-india').value = '';
-    state.filters = { source: '', status: '', min_score: 0, search: '', location: '', tech: '', india_friendly: '' };
+    document.getElementById('filter-india').value = 'Eligible';
+    document.getElementById('filter-recency').value = '30';
+    state.filters = { source: '', status: '', min_score: 55, search: '', location: '', tech: '', remote_india_eligibility: 'Eligible', max_posted_age_days: 30, recommendable_only: true };
     state.offset = 0;
     loadJobs();
 }

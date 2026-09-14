@@ -185,6 +185,58 @@ DAILY_JOBS_COUNT=20   # default: 15
 
 ## Add a New Job Source
 
+### Adding target company career sources
+
+OpenAI and ElevenLabs are configured in `sources/company_careers.py`. Their
+official Ashby boards are fetched on every collection run, even when JSearch is
+not configured. The adapters ingest every currently listed role; do not add
+title filters here, because the shared description-first scorer decides which
+roles are relevant.
+
+To add another company using Ashby, append one entry to
+`TARGET_COMPANY_CAREERS`:
+
+```python
+{
+    "name": "Example Company",
+    "domain": "example.com",
+    "careers_url": "https://example.com/careers",
+    "ats_platform": "ashby",
+    "ats_slug": "example-company",
+    "source_name": "company_careers:ashby:example-company",
+}
+```
+
+Verify the slug from the company's official careers link and its public board:
+
+```text
+https://api.ashbyhq.com/posting-api/job-board/{ats_slug}
+```
+
+Adding another ATS requires registering its adapter class in the `adapters`
+mapping inside `build_target_company_sources()`. Greenhouse and Lever adapters
+already exist in `sources/`, so this does not require scoring changes. Every
+adapter should preserve the full description, official location, posting date,
+application URL, company, and title. Give it a distinct source such as
+`company_careers:greenhouse:{slug}` so its provenance appears on the dashboard.
+
+Direct results use the same `Job` model, fingerprint, description-first scorer,
+India eligibility gate, storage threshold, and outreach threshold as all other
+sources. An aggregator copy with the same official apply URL is collapsed when
+stored.
+
+Run one company independently when validating a board or diagnosing a change:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/company-careers/openai/collect
+curl -X POST http://127.0.0.1:8000/api/company-careers/elevenlabs/collect
+```
+
+The response reports the official/ATS endpoints that succeeded, raw postings
+returned, unique postings parsed, records stored, records skipped by the scorer,
+source-level skip reasons, and request/parser errors. The server log prints the
+same per-company diagnostics during a normal collection run.
+
 ### Example: Add LinkedIn Jobs via their RSS feed
 
 Create `sources/linkedin_rss.py`:
