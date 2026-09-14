@@ -246,7 +246,7 @@ function linkedinTitleRow(t = {}) {
         <input class="lt-title" placeholder="Title (e.g. Engineering Manager)" value="${escapeAttr(t.title || '')}">
         <input class="lt-label" placeholder="Short label" value="${escapeAttr(t.label || '')}">
         <select class="lt-cat">
-            ${['engineering','executive','hr'].map(c =>
+            ${['hiring_manager','same_function','referral','recruiter','engineering','executive','hr'].map(c =>
                 `<option value="${c}" ${t.category === c ? 'selected' : ''}>${c}</option>`).join('')}
         </select>
         <button class="row-remove" type="button" onclick="this.parentElement.remove()">×</button>

@@ -2,7 +2,7 @@
 
 An automated job discovery and cold outreach system built for software engineers. Finds fresh jobs daily, scores them against a **configurable role profile**, generates personalized LinkedIn outreach templates, and emails a curated list every morning.
 
-**Target user:** Any developer running a job search — comes with presets for **Backend Python (3+ YOE)**, **Frontend React**, and **Fresher**. Swap profiles to retarget the entire pipeline (search queries, scoring weights, outreach copy) without editing code.
+**Current target:** A private, single-user search for senior strategy, operations, AI deployment, product operations, and delivery leadership roles that are genuinely remote from India. Other legacy developer presets remain available and profiles can still retarget the pipeline without editing code.
 
 ---
 
@@ -37,6 +37,7 @@ Stored as YAML in `profiles/`. Import any of them from the Profile page (or via 
 
 | Preset (`profiles/*.yaml`) | Who it's for |
 |---|---|
+| `senior_ai_operations.yaml` | 8+ YOE AI deployment, strategy/operations, product operations, implementation, and delivery leadership; the first-run default |
 | `backend_python.yaml` | Python/Django/FastAPI backend, 3+ YOE (the original target) |
 | `frontend_react.yaml` | React/TypeScript frontend roles |
 | `fresher_any.yaml` | Entry-level / 0-1 YOE across any stack |
@@ -80,7 +81,11 @@ The **sender address is fixed to `SENDER_EMAIL` in `.env`** and is not a profile
 | `GET /api/profiles/{id}/export` | Export profile back to YAML |
 | `POST /api/profiles/rescore-all` | Re-score every stored job against the active profile (`delete_below_min=true` to prune) |
 
-On first run, if no profile exists, the system seeds a `Backend Python (legacy)` profile from the pre-profile hardcoded settings and activates it — so existing installs keep working.
+On first run, if no profile exists, the system seeds and activates the senior AI/operations leadership preset. Existing installations and saved profiles are left intact.
+
+### Recommendation rules
+
+The core fit score and recommendation gates are separate decisions. The default Jobs view shows roles scoring at least 55 that are eligible for remote work from India, no more than 30 days old, and not blocked by an unsupported hard 10+ year requirement. Ambiguous remote roles are retained as **Needs Verification**, while country-restricted, hybrid, and on-site roles are marked **Ineligible**. Recency affects ranking/filtering rather than the core fit score, and a negative title excludes a role only when its description confirms outside-target IC work.
 
 ---
 
