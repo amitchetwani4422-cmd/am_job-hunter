@@ -2,6 +2,7 @@
 Two tracks: job boards (existing) + company ATS crawling (new)."""
 
 import asyncio
+import json
 from datetime import datetime
 from core.models import Job
 from core.database import (
@@ -18,6 +19,7 @@ from sources.greenhouse import GreenhouseSource
 from sources.lever import LeverSource
 from sources.ashby import AshbySource
 from sources.html_scraper import HTMLCareerSource
+from sources.company_careers import build_target_company_sources
 from config.settings import RAPIDAPI_KEY
 
 # Days before a job not re-seen gets deleted (cleanup). Could be profile-driven
@@ -35,6 +37,7 @@ def _build_job_board_sources() -> list:
         RemotiveSource(),
         RemoteOKSource(),
         ArbeitnowSource(),
+        *build_target_company_sources(),
     ]
     if RAPIDAPI_KEY:
         # Queries come from the active profile (single source of truth).
@@ -90,7 +93,8 @@ def _score_and_store(jobs: list[Job], stats: dict, profile: dict = None):
     min_store = int((profile.get("scoring") or {}).get("min_score_to_store", 25))
 
     for job in jobs:
-        result = score_job(job.title, job.description, job.location, profile=profile)
+        result = score_job(job.title, job.description, job.location, profile=profile,
+                           posted_date=job.posted_date)
 
         # Filter: drop irrelevant jobs before storing (saves DB space)
         if result["score"] < min_store:
@@ -101,6 +105,21 @@ def _score_and_store(jobs: list[Job], stats: dict, profile: dict = None):
         job.experience_level = result["experience_level"]
         job.india_friendly = result["india_friendly"]
         job.location_note = result["location_note"]
+        job.fit_classification = result["fit_classification"]
+        job.remote_india_eligibility = result["remote_india_eligibility"]
+        job.eligibility_confidence = result["eligibility_confidence"]
+        job.experience_requirement = result["experience_requirement"]
+        job.experience_compatibility = result["experience_compatibility"]
+        job.seniority = result["seniority"]
+        job.role_family = result["role_family"]
+        job.secondary_role_families = json.dumps(result["secondary_role_families"])
+        job.role_family_confidence = result["role_family_confidence"]
+        job.role_family_scores = json.dumps(result["role_family_scores"])
+        job.responsibility_evidence = json.dumps(result["responsibility_evidence"])
+        job.posted_age_days = result["posted_age_days"]
+        job.match_reasons = json.dumps(result["reasons"])
+        job.important_gaps = json.dumps(result["important_gaps"])
+        job.resume_modification_recommended = result["resume_modification_recommended"]
 
         existing_tech = set(t.strip() for t in job.tech_stack.split(",") if t.strip())
         existing_tech.update(result["tech_stack"])

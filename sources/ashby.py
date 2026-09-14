@@ -5,6 +5,7 @@ API: GET https://api.ashbyhq.com/posting-api/job-board/{slug}
 import httpx
 from sources.base import BaseSource
 from core.models import Job
+from sources.ashby_mapper import is_open_ashby_posting, map_ashby_posting
 
 
 class AshbySource(BaseSource):
@@ -13,6 +14,7 @@ class AshbySource(BaseSource):
     def __init__(self, company: dict):
         self.company = company
         self.slug = company["ats_slug"]
+        self.name = company.get("source_name") or f"ashby:{self.slug}"
 
     async def fetch(self) -> list[Job]:
         url = f"https://api.ashbyhq.com/posting-api/job-board/{self.slug}"
@@ -27,27 +29,9 @@ class AshbySource(BaseSource):
 
         jobs = []
         for item in data.get("jobs", []):
-            location = item.get("location", "")
-            if isinstance(location, dict):
-                location = location.get("name", "")
-
-            salary = ""
-            comp = item.get("compensation")
-            if comp and isinstance(comp, dict):
-                parts = comp.get("summaryComponents", [])
-                if parts:
-                    salary = " ".join(str(p) for p in parts)
-
-            job = Job(
-                title=item.get("title", ""),
-                company=self.company["name"],
-                location=location or "Remote",
-                description=item.get("descriptionHtml", "") or item.get("descriptionPlain", ""),
-                url=item.get("externalLink", "") or item.get("jobUrl", ""),
-                source=f"ashby:{self.slug}",
-                posted_date=item.get("publishedDate", ""),
-                salary=salary,
-                company_domain=self.company.get("domain", ""),
-            )
-            jobs.append(job)
+            if not is_open_ashby_posting(item):
+                continue
+            # Do not filter titles here: ingest the official board in full and
+            # let the shared description-first scorer decide relevance.
+            jobs.append(Job(**map_ashby_posting(item, self.company)))
         return jobs
