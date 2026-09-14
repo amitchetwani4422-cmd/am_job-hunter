@@ -233,6 +233,29 @@ def init_db():
 
 # ── Jobs CRUD ──────────────────────────────────────────────────
 
+def _normalize_duplicate_job(conn: sqlite3.Connection, job_dict: dict, now: str) -> None:
+    """Point duplicates at the stored id and preserve authoritative direct data.
+
+    This runs before the original fingerprint upsert block so URL-based
+    deduplication does not require changing that shared update path.
+    """
+    existing = conn.execute(
+        "SELECT * FROM jobs WHERE id = ? OR (url != '' AND url = ?) LIMIT 1",
+        (job_dict["id"], job_dict.get("url", "")),
+    ).fetchone()
+    if not existing:
+        return
+
+    job_dict["id"] = existing["id"]
+    if not should_refresh_from_source(existing["source"], job_dict.get("source", "")):
+        # Copy only fields already supplied by the incoming model so migration-
+        # specific database columns cannot leak into the update parameter set.
+        for key in list(job_dict):
+            if key in existing.keys() and key not in ("last_seen",):
+                job_dict[key] = existing[key]
+        job_dict["last_seen"] = now
+
+
 def insert_job(job_dict: dict) -> str:
     """Upsert a job.
     Returns 'new' if new, 'updated' if existed (last_seen refreshed).
@@ -243,25 +266,14 @@ def insert_job(job_dict: dict) -> str:
     job_dict["last_seen"] = now
 
     try:
-        # Prefer the stable fingerprint, but also collapse aggregator copies that
-        # resolve to the same official apply URL as a direct career-board record.
-        existing = conn.execute(
-            "SELECT id, source FROM jobs WHERE id = ? OR (url != '' AND url = ?) LIMIT 1",
-            (job_dict["id"], job_dict.get("url", "")),
-        ).fetchone()
+        _normalize_duplicate_job(conn, job_dict, now)
+        existing = conn.execute("SELECT id FROM jobs WHERE id = ?", (job_dict["id"],)).fetchone()
         if existing:
-            # A URL match can point at a row whose fingerprint differs from the
-            # incoming record, so every update must target the matched row id.
-            matched_id = existing["id"]
-            if not should_refresh_from_source(existing["source"], job_dict.get("source", "")):
-                conn.execute("UPDATE jobs SET last_seen = ? WHERE id = ?", (now, matched_id))
-                conn.commit()
-                return "updated"
             # Refresh source and assessment fields, preserving user workflow state.
             refreshed = {k: v for k, v in job_dict.items() if k not in ("id", "status", "mark_for_email", "discovered_at")}
             refreshed["last_seen"] = now
             assignments = ", ".join(f"{key} = :{key}" for key in refreshed)
-            conn.execute(f"UPDATE jobs SET {assignments} WHERE id = :id", {**refreshed, "id": matched_id})
+            conn.execute(f"UPDATE jobs SET {assignments} WHERE id = :id", {**refreshed, "id": job_dict["id"]})
             conn.commit()
             return "updated"
         job_dict.setdefault("scored_profile_id", None)
