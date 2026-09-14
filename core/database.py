@@ -250,15 +250,18 @@ def insert_job(job_dict: dict) -> str:
             (job_dict["id"], job_dict.get("url", "")),
         ).fetchone()
         if existing:
+            # A URL match can point at a row whose fingerprint differs from the
+            # incoming record, so every update must target the matched row id.
+            matched_id = existing["id"]
             if not should_refresh_from_source(existing["source"], job_dict.get("source", "")):
-                conn.execute("UPDATE jobs SET last_seen = ? WHERE id = ?", (now, existing["id"]))
+                conn.execute("UPDATE jobs SET last_seen = ? WHERE id = ?", (now, matched_id))
                 conn.commit()
                 return "updated"
             # Refresh source and assessment fields, preserving user workflow state.
             refreshed = {k: v for k, v in job_dict.items() if k not in ("id", "status", "mark_for_email", "discovered_at")}
             refreshed["last_seen"] = now
             assignments = ", ".join(f"{key} = :{key}" for key in refreshed)
-            conn.execute(f"UPDATE jobs SET {assignments} WHERE id = :id", {**refreshed, "id": existing["id"]})
+            conn.execute(f"UPDATE jobs SET {assignments} WHERE id = :id", {**refreshed, "id": matched_id})
             conn.commit()
             return "updated"
         job_dict.setdefault("scored_profile_id", None)
