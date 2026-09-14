@@ -19,6 +19,7 @@ from sources.greenhouse import GreenhouseSource
 from sources.lever import LeverSource
 from sources.ashby import AshbySource
 from sources.html_scraper import HTMLCareerSource
+from sources.company_careers import build_target_company_sources
 from config.settings import RAPIDAPI_KEY
 
 # Days before a job not re-seen gets deleted (cleanup). Could be profile-driven
@@ -36,6 +37,7 @@ def _build_job_board_sources() -> list:
         RemotiveSource(),
         RemoteOKSource(),
         ArbeitnowSource(),
+        *build_target_company_sources(),
     ]
     if RAPIDAPI_KEY:
         # Queries come from the active profile (single source of truth).

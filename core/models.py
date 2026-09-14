@@ -1,8 +1,9 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
-import hashlib
 import re
+
+from core.identity import job_fingerprint
 
 
 class Job(BaseModel):
@@ -42,8 +43,7 @@ class Job(BaseModel):
     @property
     def fingerprint(self) -> str:
         """Generate dedup fingerprint from company + title + location."""
-        raw = f"{self.company.lower().strip()}|{self.title.lower().strip()}|{self.location.lower().strip()}"
-        return hashlib.md5(raw.encode()).hexdigest()
+        return job_fingerprint(self.company, self.title, self.location)
 
     def extract_domain(self) -> str:
         """Extract company domain from job URL."""

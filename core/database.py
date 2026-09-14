@@ -1,6 +1,7 @@
 import sqlite3
 from typing import Optional
 from config.settings import DB_PATH
+from core.identity import should_refresh_from_source
 
 
 def get_connection() -> sqlite3.Connection:
@@ -232,6 +233,29 @@ def init_db():
 
 # ── Jobs CRUD ──────────────────────────────────────────────────
 
+def _normalize_duplicate_job(conn: sqlite3.Connection, job_dict: dict, now: str) -> None:
+    """Point duplicates at the stored id and preserve authoritative direct data.
+
+    This runs before the original fingerprint upsert block so URL-based
+    deduplication does not require changing that shared update path.
+    """
+    existing = conn.execute(
+        "SELECT * FROM jobs WHERE id = ? OR (url != '' AND url = ?) LIMIT 1",
+        (job_dict["id"], job_dict.get("url", "")),
+    ).fetchone()
+    if not existing:
+        return
+
+    job_dict["id"] = existing["id"]
+    if not should_refresh_from_source(existing["source"], job_dict.get("source", "")):
+        # Copy only fields already supplied by the incoming model so migration-
+        # specific database columns cannot leak into the update parameter set.
+        for key in list(job_dict):
+            if key in existing.keys() and key not in ("last_seen",):
+                job_dict[key] = existing[key]
+        job_dict["last_seen"] = now
+
+
 def insert_job(job_dict: dict) -> str:
     """Upsert a job.
     Returns 'new' if new, 'updated' if existed (last_seen refreshed).
@@ -242,6 +266,7 @@ def insert_job(job_dict: dict) -> str:
     job_dict["last_seen"] = now
 
     try:
+        _normalize_duplicate_job(conn, job_dict, now)
         existing = conn.execute("SELECT id FROM jobs WHERE id = ?", (job_dict["id"],)).fetchone()
         if existing:
             # Refresh source and assessment fields, preserving user workflow state.

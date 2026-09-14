@@ -196,6 +196,7 @@ See [docs/02-setup.md](docs/02-setup.md) for complete setup instructions.
 - **Frontend:** Vanilla JS, HTML, CSS (no framework) — three pages: Jobs, Outreach, Profile
 - **Config:** YAML presets in `profiles/` for role configurations; runtime config lives in the `profiles` SQLite table
 - **External APIs:** JSearch (RapidAPI), Greenhouse, Lever, Ashby, Remotive, RemoteOK, Arbeitnow
+- **Direct company careers:** OpenAI and ElevenLabs official Ashby boards are collected without an API key; see [Adding target companies](docs/07-customization.md#adding-target-company-career-sources)
 - **Email:** Gmail SMTP with App Password
 
 ---
